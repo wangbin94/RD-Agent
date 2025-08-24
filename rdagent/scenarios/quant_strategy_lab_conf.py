@@ -11,7 +11,7 @@ class CustomStrategyPropSetting(BasePropSetting):
     hypothesis_gen: str = "rdagent.scenarios.quant_strategy_proposal.CustomStrategyHypothesisGen"
     """Hypothesis generation class"""
 
-    hypothesis2experiment: str = "rdagent.scenarios.quant_strategy_proposal.CustomStrategyHypothesis2Experiment"
+    hypothesis2experiment: str = "rdagent.scenarios.quant_strategy_hypothesis_to_experiment.CustomStrategyHypothesis2Experiment"
     """Hypothesis to experiment class"""
 
     coder: str = "rdagent.scenarios.quant_strategy_lab_coder.CustomStrategyCoder"
