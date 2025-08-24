@@ -35,6 +35,7 @@ from rdagent.scenarios.qlib.experiment.model_experiment import (
     QlibModelScenario,
 )
 from rdagent.scenarios.qlib.experiment.quant_experiment import QlibQuantScenario
+from rdagent.scenarios.quant_strategy_lab_scenario import CustomStrategyScenario
 
 st.set_page_config(layout="wide", page_title="RD-Agent", page_icon="🎓", initial_sidebar_state="expanded")
 
@@ -66,6 +67,7 @@ SIMILAR_SCENARIOS = (
     QlibFactorFromReportScenario,
     QlibQuantScenario,
     KGScenario,
+    CustomStrategyScenario,
 )
 
 
@@ -625,7 +627,7 @@ def feedback_window():
 
             if state.lround > 0 and isinstance(
                 state.scenario,
-                (QlibModelScenario, QlibFactorScenario, QlibFactorFromReportScenario, QlibQuantScenario, KGScenario),
+                (QlibModelScenario, QlibFactorScenario, QlibFactorFromReportScenario, QlibQuantScenario, KGScenario, CustomStrategyScenario),
             ):
                 if fbr := state.msgs[round]["runner result"]:
                     try:
