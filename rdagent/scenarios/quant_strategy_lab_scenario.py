@@ -54,7 +54,10 @@ class CustomStrategyScenario(Scenario):
         
     def _generate_rich_description(self) -> str:
         """Generate rich style description for UI presentation."""
-        return f"## Custom Strategy Research Scenario\n\nFramework: **{self.framework}**\nData Path: **{self.data_path}**"
+        return f"""## Custom Strategy Research Scenario
+
+Framework: **{self.framework}**
+Data Path: **{self.data_path}**"""
         
     @property
     def background(self) -> str:
