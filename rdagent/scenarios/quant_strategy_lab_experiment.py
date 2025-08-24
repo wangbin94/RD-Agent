@@ -11,8 +11,7 @@ class StrategyExperiment(Experiment):
         Parameters:
         - tasks: List of StrategyTask objects
         """
-        super().__init__(*args, **kwargs)
-        self.sub_tasks = tasks
+        super().__init__(sub_tasks=tasks, *args, **kwargs)
         self.experiment_workspace = StrategyWorkspace()
         self.result: Optional[Dict[str, Any]] = None
         self.stdout: str = ""
