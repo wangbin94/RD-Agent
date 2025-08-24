@@ -1109,7 +1109,12 @@ if state.scenario is not None:
             r_options = list(state.msgs.keys())
             if 0 in r_options:
                 r_options.remove(0)
-            round = st.radio("**Loops**", horizontal=True, options=r_options, index=state.lround - 1)
+            if r_options:  # Check if there are any options left
+                # Ensure the index is within valid range
+                initial_index = max(0, min(state.lround - 1, len(r_options) - 1))
+                round = st.radio("**Loops**", horizontal=True, options=r_options, index=initial_index)
+            else:
+                round = 1  # Default to 1 if no options available
         else:
             round = 1
 
