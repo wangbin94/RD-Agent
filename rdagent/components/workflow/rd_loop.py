@@ -9,6 +9,7 @@ from typing import Any
 from rdagent.components.workflow.conf import BasePropSetting
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.core.developer import Developer
+from rdagent.core.experiment import Experiment
 from rdagent.core.proposal import (
     Experiment2Feedback,
     Hypothesis,
@@ -47,9 +48,8 @@ class RDLoop(LoopBase, metaclass=LoopMeta):
         logger.log_object(hypothesis, tag="hypothesis generation")
         return hypothesis
 
-    def _exp_gen(self, hypothesis: Hypothesis):
+    def _exp_gen(self, hypothesis: Hypothesis) -> Experiment:
         exp = self.hypothesis2experiment.convert(hypothesis, self.trace)
-        logger.log_object(exp.sub_tasks, tag="experiment generation")
         return exp
 
     # included steps
