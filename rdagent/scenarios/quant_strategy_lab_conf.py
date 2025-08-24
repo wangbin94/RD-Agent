@@ -27,7 +27,7 @@ class CustomStrategyPropSetting(BasePropSetting):
     """Number of evolutions"""
 
     # Custom strategy specific settings
-    data_path: str = "data"
+    data_path: str = "/workspace/quant-strategy-lab/data/2025-05-09/1d"
     """Path to the directory containing CSV data files"""
     
     framework: str = "vectorbt"

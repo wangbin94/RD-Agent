@@ -9,7 +9,7 @@ from rdagent.utils.agent.tpl import T
 from rdagent.oai.llm_utils import APIBackend
 
 class CustomStrategyScenario(Scenario):
-    def __init__(self, data_path: str = "data", framework: str = "vectorbt") -> None:
+    def __init__(self, data_path: str = "/workspace/quant-strategy-lab/data/2025-05-09/1d", framework: str = "vectorbt") -> None:
         """
         Initialize the Custom Strategy Scenario for quant-strategy-lab.
         
