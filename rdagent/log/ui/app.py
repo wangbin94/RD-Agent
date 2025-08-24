@@ -35,6 +35,8 @@ from rdagent.scenarios.qlib.experiment.model_experiment import (
     QlibModelScenario,
 )
 from rdagent.scenarios.qlib.experiment.quant_experiment import QlibQuantScenario
+from rdagent.scenarios.simple_ma_scenario import SimpleBacktestScenario # Added for our scenario
+from rdagent.scenarios.optimal_day_trading_scenario import OptimalDayTradingStrategyScenario
 
 st.set_page_config(layout="wide", page_title="RD-Agent", page_icon="🎓", initial_sidebar_state="expanded")
 
@@ -66,6 +68,8 @@ SIMILAR_SCENARIOS = (
     QlibFactorFromReportScenario,
     QlibQuantScenario,
     KGScenario,
+    SimpleBacktestScenario, # Add our scenario here
+    OptimalDayTradingStrategyScenario,
 )
 
 
@@ -80,7 +84,12 @@ def filter_log_folders(main_log_path):
 
 if "log_path" not in state:
     if main_log_path:
-        state.log_path = filter_log_folders(main_log_path)[0]
+        log_folders = filter_log_folders(main_log_path)
+        if log_folders:
+            state.log_path = log_folders[0]
+        else:
+            state.log_path = None
+            st.toast(":orange[**No log folders found yet!**]", icon="ℹ️")
     else:
         state.log_path = None
         st.toast(":red[**Please Set Log Path!**]", icon="⚠️")

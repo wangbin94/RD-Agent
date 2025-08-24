@@ -1,0 +1,222 @@
+version: '3.8'
+
+services:
+  # Main RD-Agent Service
+  rd-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    container_name: rd-agent-main
+    working_dir: /workspace/RD-Agent
+    volumes:
+      - .:/workspace/RD-Agent:rw
+      - ./data:/workspace/data:rw
+      - ./log:/workspace/log:rw
+      - ./mlruns:/workspace/mlruns:rw
+      - ~/.conda:/.conda:ro
+    environment:
+      - PYTHONPATH=/workspace/RD-Agent
+      - CHAT_MODEL=${CHAT_MODEL:-o1-preview}
+      - CHAT_TEMPERATURE=${CHAT_TEMPERATURE:-1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-ada-002}
+      - BACKEND=${BACKEND:-rdagent.oai.backend.LiteLLMAPIBackend}
+      - DS_CODER_COSTEER_ENV_TYPE=${DS_CODER_COSTEER_ENV_TYPE:-conda}
+      - DS_CODER_ON_WHOLE_PIPELINE=${DS_CODER_ON_WHOLE_PIPELINE:-True}
+      - ENABLE_CACHE=${ENABLE_CACHE:-False}
+      - LOG_LLM_CHAT_CONTENT=${LOG_LLM_CHAT_CONTENT:-True}
+    ports:
+      - "8080:8000"  # Streamlit demo
+      - "5050:5000"  # Flask API
+      - "8502:8502"  # Enhanced Strategy Evolution UI
+    networks:
+      - rd-agent-network
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+    command: >
+      bash -c "
+        streamlit run /workspace/RD-Agent/rdagent/log/ui/app.py --server.port 8000 --server.address 0.0.0.0 -- --log_dir /workspace/RD-Agent/log &
+        wait
+      "
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4.0'
+        reservations:
+          memory: 4G
+          cpus: '2.0'
+
+  # MLflow Service for Experiment Tracking
+  mlflow:
+    image: python:3.11-slim
+    container_name: rd-agent-mlflow
+    working_dir: /workspace
+    volumes:
+      - ./mlruns:/workspace/mlruns:rw
+      - ./requirements.txt:/workspace/requirements.txt:ro
+    environment:
+      - MLFLOW_TRACKING_URI=http://localhost:5001
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=${MLFLOW_S3_ACCESS_KEY:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MLFLOW_S3_SECRET_KEY:-minioadmin}
+      - MLFLOW_HOST=0.0.0.0
+      - MLFLOW_PORT=5000
+    ports:
+      - "5001:5000"
+    command: >
+      bash -c "
+        pip install mlflow azureml-mlflow &&
+        mlflow server
+          --host 0.0.0.0
+          --port 5000
+          --backend-store-uri sqlite:///mlruns/mlflow.db
+          --default-artifact-root s3://mlflow/
+      "
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+    depends_on:
+      - minio
+
+  # MinIO for MLflow Artifact Storage
+  minio:
+    image: minio/minio:latest
+    container_name: rd-agent-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MLFLOW_S3_ACCESS_KEY:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MLFLOW_S3_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+
+  # Redis for Caching and Message Queue
+  redis:
+    image: redis:7-alpine
+    container_name: rd-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+
+  # PostgreSQL for Persistent Data Storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: rd-agent-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-rdagent}
+      - POSTGRES_USER=${POSTGRES_USER:-rdagent}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rdagent123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+
+  # Jupyter Notebook Service
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rd-agent-jupyter
+    working_dir: /workspace/RD-Agent
+    volumes:
+      - .:/workspace/RD-Agent:rw
+      - ./notebooks:/workspace/notebooks:rw
+      - ./data:/workspace/data:rw
+    environment:
+      - PYTHONPATH=/workspace/RD-Agent
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-rdagent}
+    ports:
+      - "8888:8888"
+    command: >
+      bash -c "
+        pip install jupyterlab ipywidgets &&
+        jupyter lab
+          --ip=0.0.0.0
+          --port=8888
+          --no-browser
+          --allow-root
+          --NotebookApp.token=${JUPYTER_TOKEN:-rdagent}
+          --NotebookApp.password=''
+      "
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+    depends_on:
+      - rd-agent
+
+  # Monitoring and Logging Service
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rd-agent-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+
+  # Grafana for Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rd-agent-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - rd-agent-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  minio_data:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  rd-agent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
