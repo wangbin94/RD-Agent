@@ -1,5 +1,5 @@
 from rdagent.core.scenario import Scenario
-from rdagent.core.hypothesis import Hypothesis
+from rdagent.core.proposal import Hypothesis
 from rdagent.core.prompts import Prompts
 from rdagent.oai.llm_utils import APIBackend
 from typing import List
