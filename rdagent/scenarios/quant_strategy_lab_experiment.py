@@ -29,7 +29,8 @@ class StrategyWorkspace(FBWorkspace):
         """Initialize a Strategy Workspace."""
         super().__init__(*args, **kwargs)
         # Create directories for strategy code
-        (self.workspace_path / "strategies").mkdir(exist_ok=True)
+        strategies_dir = self.workspace_path / "strategies"
+        strategies_dir.mkdir(parents=True, exist_ok=True)
         
     def save_strategy_code(self, strategy_name: str, code: str) -> None:
         """
