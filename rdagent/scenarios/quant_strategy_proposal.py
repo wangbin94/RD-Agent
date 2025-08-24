@@ -11,6 +11,15 @@ class CustomStrategyHypothesis(Hypothesis):
                  formulation: str, 
                  factors: List[str],
                  rationale: str = ""):
+        # Call parent constructor with required parameters
+        super().__init__(
+            hypothesis=name,
+            reason=description,
+            concise_reason=description[:100] if len(description) > 100 else description,
+            concise_observation="",
+            concise_justification=rationale[:100] if len(rationale) > 100 else rationale,
+            concise_knowledge=""
+        )
         self.name = name
         self.description = description
         self.formulation = formulation
@@ -28,11 +37,12 @@ class CustomStrategyHypothesisGen:
     def __init__(self, scen: Scenario):
         self.scen = scen
         
-    def gen(self, num_hypotheses: int = 5) -> List[CustomStrategyHypothesis]:
+    def gen(self, trace, num_hypotheses: int = 5):
         """
         Generate hypotheses for custom strategies.
         
         Parameters:
+        - trace: Trace object
         - num_hypotheses: Number of hypotheses to generate
         
         Returns:
@@ -75,7 +85,15 @@ class CustomStrategyHypothesisGen:
         # Parse the JSON response
         import json
         try:
-            hypotheses_data = json.loads(response)
+            # Try to parse as JSON object first
+            response_data = json.loads(response)
+            # If it's a dict with a "strategies" key, use that
+            if isinstance(response_data, dict) and "strategies" in response_data:
+                hypotheses_data = response_data["strategies"]
+            else:
+                # Otherwise assume it's the array directly
+                hypotheses_data = response_data
+                
             hypotheses = []
             for h in hypotheses_data:
                 hypotheses.append(CustomStrategyHypothesis(
@@ -83,9 +101,10 @@ class CustomStrategyHypothesisGen:
                     description=h["description"],
                     formulation=h["formulation"],
                     factors=h["factors"],
-                    rationale=h["rationale"]
+                    rationale=h.get("rationale", "")
                 ))
             return hypotheses
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
             # Fallback if JSON parsing fails
+            print(f"Error parsing JSON response: {e}")
             return []
