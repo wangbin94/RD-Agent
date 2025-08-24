@@ -54,10 +54,14 @@ class CustomStrategyScenario(Scenario):
         
     def _generate_rich_description(self) -> str:
         """Generate rich style description for UI presentation."""
+        # Escape any special characters that might cause HTML issues
+        framework = self.framework.replace("<", "<").replace(">", ">").replace("&", "&")
+        data_path = str(self.data_path).replace("<", "<").replace(">", ">").replace("&", "&")
+        
         return f"""## Custom Strategy Research Scenario
 
-Framework: **{self.framework}**
-Data Path: **{self.data_path}**"""
+Framework: **{framework}**
+Data Path: **{data_path}**"""
         
     @property
     def background(self) -> str:
