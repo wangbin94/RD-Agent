@@ -181,9 +181,14 @@ def get_msgs_until(end_func: Callable[[Message], bool] = lambda _: True):
                                 sms = msg.content.based_experiments[0].result
                             except AttributeError:
                                 sms = msg.content.based_experiments[0].__dict__["result"]
-                            sms = sms.loc[QLIB_SELECTED_METRICS]
-                            sms.name = "Alpha Base"
-                            state.alpha_baseline_metrics = sms
+                            if isinstance(sms, dict):
+                                # Handle dictionary case
+                                state.alpha_baseline_metrics = sms
+                            else:
+                                # Handle pandas Series/DataFrame case
+                                sms = sms.loc[QLIB_SELECTED_METRICS]
+                                sms.name = "Alpha Base"
+                                state.alpha_baseline_metrics = sms
 
                         if state.lround == 1 and len(msg.content.based_experiments) > 0:
                             try:
@@ -223,10 +228,22 @@ def get_msgs_until(end_func: Callable[[Message], bool] = lambda _: True):
                             sms_all = sms
                             sms = sms.loc[QLIB_SELECTED_METRICS]
 
-                        sms.name = f"Round {state.lround}"
-                        sms_all.name = f"Round {state.lround}"
+                        # Only set name attribute if the object has it (e.g., pandas Series/DataFrame)
+                        if hasattr(sms, 'name'):
+                            sms.name = f"Round {state.lround}"
+                        elif isinstance(sms, dict):
+                            # For dictionaries, we can't set name attribute, but we can handle it differently
+                            pass
+                            
+                        if 'sms_all' in locals() and hasattr(sms_all, 'name'):
+                            sms_all.name = f"Round {state.lround}"
+                        elif 'sms_all' in locals() and isinstance(sms_all, dict):
+                            # For dictionaries, we can't set name attribute, but we can handle it differently
+                            pass
+                            
                         state.metric_series.append(sms)
-                        state.all_metric_series.append(sms_all)
+                        if 'sms_all' in locals():
+                            state.all_metric_series.append(sms_all)
                     elif "hypothesis generation" in tags:
                         state.hypotheses[state.lround] = msg.content
                     elif "evolving code" in tags:
