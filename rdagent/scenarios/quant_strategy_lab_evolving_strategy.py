@@ -1,98 +1,149 @@
-from rdagent.components.coder.CoSTEER.evolvable_subjects import EvolvingItem
-from rdagent.core.evolving_framework import EvolvingStrategy, QueriedKnowledge
+from rdagent.components.coder.CoSTEER.evolving_strategy import MultiProcessEvolvingStrategy
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEERSingleFeedback
+from rdagent.components.coder.CoSTEER.knowledge_management import CoSTEERQueriedKnowledge
 from rdagent.core.experiment import FBWorkspace
 from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
-from rdagent.scenarios.quant_strategy_lab_evaluator import StrategyFeedback
-from rdagent.utils.agent.tpl import T
+from rdagent.scenarios.quant_strategy_lab_experiment import StrategyWorkspace
 from rdagent.oai.llm_utils import APIBackend
 from rdagent.log import rdagent_logger as logger
 
 
-class StrategyEvolvingStrategy(EvolvingStrategy):
+class StrategyEvolvingStrategy(MultiProcessEvolvingStrategy):
     """
     Evolving strategy for improving trading strategies based on backtest feedback.
     """
     
     def __init__(self, scen):
-        super().__init__(scen)
+        # Get settings from scenario or use default None
+        settings = getattr(scen, 'settings', None)
+        super().__init__(scen, settings)
     
-    def evolve(
+    def implement_one_task(
         self,
         target_task: StrategyTask,
-        implementation: FBWorkspace,
-        feedback: StrategyFeedback,
-        queried_knowledge: QueriedKnowledge | None = None,
-    ) -> FBWorkspace:
+        queried_knowledge: CoSTEERQueriedKnowledge | None = None,
+        workspace: FBWorkspace | None = None,
+        prev_task_feedback: CoSTEERSingleFeedback | None = None,
+    ) -> str:
         """
-        Evolve a strategy implementation based on performance feedback.
+        Implement one strategy task by evolving the strategy code based on feedback.
         
         Parameters:
         - target_task: The strategy task specification
-        - implementation: Current strategy code implementation  
-        - feedback: Performance feedback from backtesting
         - queried_knowledge: Optional knowledge context
+        - workspace: Current strategy code implementation  
+        - prev_task_feedback: Performance feedback from previous evaluation
         
         Returns:
-        - Improved strategy implementation
+        - Improved strategy code as string
         """
         try:
-            logger.info(f"Evolving strategy: {target_task.name}")
-            logger.info(f"Current performance: {feedback}")
+            logger.info(f"Implementing strategy: {target_task.name}")
+            
+            # Get current strategy code from workspace
+            current_code = ""
+            if workspace and workspace.file_dict:
+                for filename, content in workspace.file_dict.items():
+                    if filename.endswith('.py'):
+                        current_code = content
+                        break
+            
+            # Convert CoSTEER feedback to strategy feedback format
+            strategy_feedback = self._convert_feedback(prev_task_feedback)
             
             # Generate improved strategy code using LLM
             improved_code = self._generate_improved_strategy(
-                target_task, implementation, feedback, queried_knowledge
+                target_task, current_code, strategy_feedback, queried_knowledge
             )
             
-            # Create new workspace with improved code
-            new_workspace = FBWorkspace()
-            new_workspace.workspace_path = implementation.workspace_path
-            
-            # Copy existing files and update strategy code
-            for file_name, content in implementation.file_dict.items():
-                if file_name.endswith('.py') and 'strategy' in file_name.lower():
-                    # This is the main strategy file - replace with improved version
-                    new_workspace.file_dict[file_name] = improved_code
-                else:
-                    # Keep other files unchanged
-                    new_workspace.file_dict[file_name] = content
-            
-            logger.info(f"Strategy evolution complete for: {target_task.name}")
-            return new_workspace
+            logger.info(f"Strategy implementation complete for: {target_task.name}")
+            return improved_code
             
         except Exception as e:
-            logger.error(f"Strategy evolution failed: {e}")
+            logger.error(f"Strategy implementation failed: {e}")
             # Return original implementation if evolution fails
-            return implementation
+            return current_code
+    
+    def assign_code_list_to_evo(self, code_list, evo):
+        """
+        Assign evolved code list to the evolving item.
+        
+        Parameters:
+        - code_list: List of evolved code strings
+        - evo: Evolving item to assign code to
+        
+        Returns:
+        - Updated evolving item
+        """
+        for index in range(len(evo.sub_tasks)):
+            if code_list[index] is None:
+                continue
+            if evo.sub_workspace_list[index] is None:
+                evo.sub_workspace_list[index] = StrategyWorkspace()
+            # Use the sanitized name for the file
+            filename = f"{evo.sub_tasks[index].sanitized_name}.py"
+            evo.sub_workspace_list[index].inject_files(**{filename: code_list[index]})
+        return evo
+    
+    def _convert_feedback(self, feedback: CoSTEERSingleFeedback) -> dict:
+        """
+        Convert CoSTEER feedback to strategy feedback format.
+        
+        Parameters:
+        - feedback: CoSTEER feedback from evaluation
+        
+        Returns:
+        - Dictionary with strategy feedback information
+        """
+        if feedback is None:
+            return {
+                'total_return': None,
+                'sharpe_ratio': None,
+                'max_drawdown': None,
+                'win_rate': None,
+                'code_executable': True,
+                'code_has_errors': False,
+                'improvement_suggestion': "No feedback available. Focus on implementing a robust strategy."
+            }
+        
+        # Parse feedback information from CoSTEER feedback
+        # This is a simplified conversion - in practice, you might want to extract
+        # more detailed information from the feedback strings
+        return {
+            'total_return': None,  # Would need to parse from feedback.execution or feedback.return_checking
+            'sharpe_ratio': None,
+            'max_drawdown': None,
+            'win_rate': None,
+            'code_executable': feedback.execution is not None and "error" not in feedback.execution.lower(),
+            'code_has_errors': feedback.execution is not None and "error" in feedback.execution.lower(),
+            'improvement_suggestion': feedback.code or "Improve strategy logic and performance."
+        }
     
     def _generate_improved_strategy(
         self, 
         task: StrategyTask, 
-        current_impl: FBWorkspace, 
-        feedback: StrategyFeedback,
-        knowledge: QueriedKnowledge | None
+        current_code: str,
+        feedback: dict,
+        knowledge: CoSTEERQueriedKnowledge | None
     ) -> str:
         """
         Generate improved strategy code using LLM based on feedback.
         """
-        # Get current strategy code
-        current_code = ""
-        strategy_filename = ""
-        for filename, content in current_impl.file_dict.items():
-            if filename.endswith('.py'):
-                current_code = content
-                strategy_filename = filename
-                break
-        
         # Build knowledge context
         knowledge_context = ""
-        if knowledge and hasattr(knowledge, 'content'):
-            knowledge_context = f"\nRelevant Knowledge:\n{knowledge.content}\n"
+        if knowledge:
+            # Try to extract useful knowledge from the queried knowledge
+            if hasattr(knowledge, 'task_to_similar_task_successful_knowledge'):
+                similar_knowledge = knowledge.task_to_similar_task_successful_knowledge.get(
+                    task.get_task_information(), []
+                )
+                if similar_knowledge:
+                    knowledge_context = f"\nRelevant Knowledge:\n{similar_knowledge[0] if similar_knowledge else ''}\n"
         
         # Create system prompt for strategy improvement
         system_prompt = """
         You are an expert quantitative trading strategy developer specializing in strategy optimization.
-        Your task is to improve an existing trading strategy based on backtest performance feedback.
+        Your task is to improve an existing trading strategy based on feedback.
         
         Guidelines for improvement:
         1. Maintain the original strategy concept but enhance the implementation
@@ -116,15 +167,15 @@ class StrategyEvolvingStrategy(EvolvingStrategy):
         ```
         
         Performance Feedback:
-        - Total Return: {feedback.total_return}
-        - Sharpe Ratio: {feedback.sharpe_ratio}  
-        - Max Drawdown: {feedback.max_drawdown}
-        - Win Rate: {feedback.win_rate}
-        - Code Executable: {feedback.code_executable}
-        - Has Errors: {feedback.code_has_errors}
+        - Total Return: {feedback['total_return']}
+        - Sharpe Ratio: {feedback['sharpe_ratio']}  
+        - Max Drawdown: {feedback['max_drawdown']}
+        - Win Rate: {feedback['win_rate']}
+        - Code Executable: {feedback['code_executable']}
+        - Has Errors: {feedback['code_has_errors']}
         
         Improvement Suggestions:
-        {feedback.improvement_suggestion or "Focus on improving risk-adjusted returns."}
+        {feedback['improvement_suggestion']}
         
         {knowledge_context}
         
