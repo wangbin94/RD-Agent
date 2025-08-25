@@ -90,13 +90,14 @@ class StrategyEvaluator(CoSTEEREvaluator):
         super().__init__(scen)
         self.runner = runner
     
-    def evaluate(self, target_task, implementation: FBWorkspace, queried_knowledge=None, **kwargs) -> StrategyFeedback:
+    def evaluate(self, target_task, implementation: FBWorkspace, gt_implementation: FBWorkspace = None, queried_knowledge=None, **kwargs) -> StrategyFeedback:
         """
         Evaluate a strategy implementation by running backtest and analyzing results.
         
         Parameters:
         - target_task: StrategyTask containing strategy specification
         - implementation: FBWorkspace containing strategy code
+        - gt_implementation: Ground truth implementation (optional)
         - queried_knowledge: Optional knowledge context
         
         Returns:
