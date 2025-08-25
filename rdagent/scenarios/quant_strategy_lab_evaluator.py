@@ -110,7 +110,7 @@ class StrategyEvaluator(CoSTEEREvaluator):
             # Create workspace and experiment for evaluation
             temp_workspace = StrategyWorkspace()
             temp_experiment = StrategyExperiment(
-                sub_tasks=[target_task],
+                tasks=[target_task],
                 experiment_workspace=temp_workspace
             )
             
