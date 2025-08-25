@@ -116,7 +116,9 @@ class StrategyEvaluator(CoSTEEREvaluator):
             
             # Copy implementation code to workspace
             for file_name, content in implementation.file_dict.items():
-                temp_workspace.save_code_file(file_name, content)
+                # Extract strategy name from file name (remove .py extension)
+                strategy_name = file_name[:-3] if file_name.endswith('.py') else file_name
+                temp_workspace.save_strategy(strategy_name, content)
             
             # Run the strategy backtest
             logger.info(f"Evaluating strategy: {target_task.name}")
