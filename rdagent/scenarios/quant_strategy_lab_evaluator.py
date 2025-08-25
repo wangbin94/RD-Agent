@@ -105,8 +105,7 @@ class StrategyEvaluator(CoSTEEREvaluator):
         """
         try:
             # Create a temporary experiment to run the strategy
-            from rdagent.scenarios.quant_strategy_lab_experiment import StrategyExperiment
-            from rdagent.scenarios.quant_strategy_lab_workspace import StrategyWorkspace
+            from rdagent.scenarios.quant_strategy_lab_experiment import StrategyExperiment, StrategyWorkspace
             
             # Create workspace and experiment for evaluation
             temp_workspace = StrategyWorkspace()
@@ -138,6 +137,9 @@ class StrategyEvaluator(CoSTEEREvaluator):
         except Exception as e:
             logger.error(f"Strategy evaluation failed: {e}")
             return StrategyFeedback(
+                execution=f"Execution failed with error: {str(e)}",
+                return_checking=None,
+                code=f"Code evaluation failed with error: {str(e)}",
                 code_executable=False,
                 code_has_errors=True,
                 acceptable=False,
@@ -182,6 +184,9 @@ class StrategyEvaluator(CoSTEEREvaluator):
                 code_executable = False
             
             return StrategyFeedback(
+                execution="Strategy executed successfully",
+                return_checking=f"Performance metrics - Total Return: {total_return}, Sharpe Ratio: {sharpe_ratio}",
+                code="Code executed without errors",
                 total_return=total_return,
                 sharpe_ratio=sharpe_ratio,
                 max_drawdown=max_drawdown,
@@ -194,6 +199,9 @@ class StrategyEvaluator(CoSTEEREvaluator):
         except Exception as e:
             logger.error(f"Failed to parse results: {e}")
             return StrategyFeedback(
+                execution=f"Failed to parse results: {str(e)}",
+                return_checking=None,
+                code=f"Code evaluation failed with error: {str(e)}",
                 code_executable=False,
                 code_has_errors=True,
                 acceptable=False
