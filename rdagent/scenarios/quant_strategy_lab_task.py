@@ -1,3 +1,4 @@
+import re
 from rdagent.components.coder.CoSTEER.task import CoSTEERTask
 from typing import Dict, Any, Optional
 
@@ -25,6 +26,19 @@ class StrategyTask(CoSTEERTask):
         self.parameters = parameters
         self.logic_formulation = logic_formulation
         super().__init__(name=name, description=description, *args, **kwargs)
+        
+    @property
+    def sanitized_name(self) -> str:
+        """
+        Get the sanitized name for use in file names.
+        """
+        # Sanitize the strategy name to create a valid file name
+        sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', self.name)
+        # Remove multiple consecutive underscores
+        sanitized = re.sub(r'_+', '_', sanitized)
+        # Remove leading/trailing underscores
+        sanitized = sanitized.strip('_')
+        return sanitized
         
     def get_task_information(self) -> str:
         """Return a string representation for LLM prompts."""

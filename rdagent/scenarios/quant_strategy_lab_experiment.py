@@ -1,3 +1,4 @@
+import re
 from rdagent.core.experiment import Experiment, FBWorkspace
 from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
 from typing import List, Dict, Any, Optional
@@ -28,19 +29,32 @@ class StrategyWorkspace(FBWorkspace):
     def __init__(self, *args, **kwargs) -> None:
         """Initialize a Strategy Workspace."""
         super().__init__(*args, **kwargs)
-        # Create directories for strategy code
-        strategies_dir = self.workspace_path / "strategies"
-        strategies_dir.mkdir(parents=True, exist_ok=True)
         
-    def save_strategy_code(self, strategy_name: str, code: str) -> None:
+    def save_strategy(self, strategy_name: str, code: str) -> None:
         """
-        Save generated strategy code to workspace.
+        Save a strategy to a Python file.
         
         Parameters:
         - strategy_name: Name of the strategy
         - code: Generated Python code for the strategy
         """
-        strategy_file = self.workspace_path / "strategies" / f"{strategy_name}.py"
+        # Import StrategyTask to check if strategy_name is a StrategyTask
+        from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
+        
+        # If strategy_name is a StrategyTask, use its sanitized_name
+        if isinstance(strategy_name, StrategyTask):
+            sanitized_name = strategy_name.sanitized_name
+        else:
+            # Sanitize the strategy name to create a valid file name
+            sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '_', strategy_name)
+            # Remove multiple consecutive underscores
+            sanitized_name = re.sub(r'_+', '_', sanitized_name)
+            # Remove leading/trailing underscores
+            sanitized_name = sanitized_name.strip('_')
+            
+        strategy_file = self.workspace_path / "strategies" / f"{sanitized_name}.py"
+        # Create the strategies directory if it doesn't exist
+        strategy_file.parent.mkdir(parents=True, exist_ok=True)
         strategy_file.write_text(code)
         
     def get_strategy_file_path(self, strategy_name: str) -> Path:
@@ -53,4 +67,18 @@ class StrategyWorkspace(FBWorkspace):
         Returns:
         - Path to the strategy file
         """
-        return self.workspace_path / "strategies" / f"{strategy_name}.py"
+        # Import StrategyTask to check if strategy_name is a StrategyTask
+        from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
+        
+        # If strategy_name is a StrategyTask, use its sanitized_name
+        if isinstance(strategy_name, StrategyTask):
+            sanitized_name = strategy_name.sanitized_name
+        else:
+            # Sanitize the strategy name to create a valid file name
+            sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '_', strategy_name)
+            # Remove multiple consecutive underscores
+            sanitized_name = re.sub(r'_+', '_', sanitized_name)
+            # Remove leading/trailing underscores
+            sanitized_name = sanitized_name.strip('_')
+            
+        return self.workspace_path / "strategies" / f"{sanitized_name}.py"
