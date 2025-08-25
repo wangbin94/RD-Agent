@@ -110,9 +110,9 @@ class StrategyEvaluator(CoSTEEREvaluator):
             # Create workspace and experiment for evaluation
             temp_workspace = StrategyWorkspace()
             temp_experiment = StrategyExperiment(
-                tasks=[target_task],
-                experiment_workspace=temp_workspace
+                tasks=[target_task]
             )
+            temp_experiment.experiment_workspace = temp_workspace
             
             # Copy implementation code to workspace
             for file_name, content in implementation.file_dict.items():
