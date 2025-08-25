@@ -4,6 +4,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import CoSTEERQueried
 from rdagent.core.experiment import FBWorkspace
 from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
 from rdagent.scenarios.quant_strategy_lab_experiment import StrategyWorkspace
+from rdagent.scenarios.quant_strategy_lab_coder import TaskWorkspace
 from rdagent.oai.llm_utils import APIBackend
 from rdagent.log import rdagent_logger as logger
 
@@ -79,7 +80,7 @@ class StrategyEvolvingStrategy(MultiProcessEvolvingStrategy):
             if code_list[index] is None:
                 continue
             if evo.sub_workspace_list[index] is None:
-                evo.sub_workspace_list[index] = StrategyWorkspace()
+                evo.sub_workspace_list[index] = TaskWorkspace(evo.sub_tasks[index], evo.experiment_workspace.workspace_path)
             # Use the sanitized name for the file
             filename = f"{evo.sub_tasks[index].sanitized_name}.py"
             evo.sub_workspace_list[index].inject_files(**{filename: code_list[index]})

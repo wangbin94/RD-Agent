@@ -14,9 +14,10 @@ from rdagent.core.experiment import FBWorkspace
 from rdagent.log import rdagent_logger as logger
 import json
 
-class TaskWorkspace:
+class TaskWorkspace(FBWorkspace):
     """Workspace object for displaying task results in UI"""
     def __init__(self, task, workspace_path):
+        super().__init__()
         self.target_task = task
         self.workspace_path = workspace_path
         self.file_dict = {}  # Will be populated with filename -> code mappings
@@ -63,9 +64,8 @@ class CustomStrategyCoder(CoSTEER):
                 code = self._generate_strategy_code(task)
                 
                 if code and code.strip():
-                    # Create FBWorkspace for CoSTEER evolution
-                    workspace = FBWorkspace()
-                    workspace.workspace_path = exp.experiment_workspace.workspace_path
+                    # Create TaskWorkspace for CoSTEER evolution
+                    workspace = TaskWorkspace(task, exp.experiment_workspace.workspace_path)
                     workspace.file_dict = {f"{task.sanitized_name}.py": code}
                     
                     # Save code to experiment workspace
