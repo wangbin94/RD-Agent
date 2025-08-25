@@ -76,13 +76,18 @@ def filter_log_folders(main_log_path):
     Filter and return the log folders relative to the main log path.
     """
     folders = [folder.relative_to(main_log_path) for folder in main_log_path.iterdir() if folder.is_dir()]
-    folders = sorted(folders, key=lambda x: x.name)
+    # Sort by modification time, newest first
+    folders = sorted(folders, key=lambda x: (main_log_path / x).stat().st_mtime, reverse=True)
     return folders
 
 
 if "log_path" not in state:
     if main_log_path:
-        state.log_path = filter_log_folders(main_log_path)[0]
+        folders = filter_log_folders(main_log_path)
+        if folders:
+            state.log_path = folders[0]
+        else:
+            state.log_path = None
     else:
         state.log_path = None
         st.toast(":red[**Please Set Log Path!**]", icon="⚠️")
@@ -165,6 +170,8 @@ def get_msgs_until(end_func: Callable[[Message], bool] = lambda _: True):
                     msg.tag = msg.tag.strip(".")
 
                     if "evolving code" not in state.current_tags and "evolving code" in tags:
+                        state.erounds[state.lround] += 1
+                    elif "coding" not in state.current_tags and "coding" in tags:
                         state.erounds[state.lround] += 1
 
                     state.current_tags = tags
@@ -395,11 +402,33 @@ def metrics_window(df: pd.DataFrame, R: int, C: int, *, height: int = 300, color
         lines = textwrap.wrap(text, width=60)
         return f"<span style='color: {color};'>{'<br>'.join(lines)}</span>"
 
-    hover_texts = [
-        hypothesis_hover_text(state.hypotheses[int(i[6:])], state.h_decisions[int(i[6:])])
-        for i in df.index
-        if i != "Alpha Base" and i != "Baseline"
-    ]
+    hover_texts = []
+    current_hypotheses = state.hypotheses.get(state.lround, [])
+    current_decisions = state.h_decisions.get(state.lround, [])
+    
+    # Convert to list if it's a single hypothesis object
+    if not isinstance(current_hypotheses, list):
+        current_hypotheses = [current_hypotheses] if current_hypotheses else []
+    if not isinstance(current_decisions, list):
+        current_decisions = [current_decisions] if current_decisions else []
+    
+    for i in df.index:
+        if i != "Alpha Base" and i != "Baseline":
+            # Handle different index formats safely
+            if isinstance(i, str) and i.startswith("hypo_"):
+                try:
+                    idx = int(i[5:])  # "hypo_" is 5 characters, not 6
+                    if idx < len(current_hypotheses) and idx < len(current_decisions):
+                        hover_texts.append(hypothesis_hover_text(current_hypotheses[idx], current_decisions[idx]))
+                except (ValueError, IndexError, KeyError):
+                    pass
+            elif isinstance(i, int):
+                # Handle integer indices directly
+                try:
+                    if i < len(current_hypotheses) and i < len(current_decisions):
+                        hover_texts.append(hypothesis_hover_text(current_hypotheses[i], current_decisions[i]))
+                except (IndexError, KeyError):
+                    pass
     if state.alpha_baseline_metrics is not None:
         hover_texts = ["Baseline"] + hover_texts
     for ci, col in enumerate(df.columns):
@@ -441,7 +470,40 @@ def metrics_window(df: pd.DataFrame, R: int, C: int, *, height: int = 300, color
 
 
 def summary_window():
-    if isinstance(state.scenario, SIMILAR_SCENARIOS):
+    if isinstance(state.scenario, CustomStrategyScenario):
+        # Separate UI handling for CustomStrategyScenario
+        st.header("Summary📊", divider="rainbow", anchor="_summary")
+        if state.lround == 0:
+            return
+        with st.container(border=True):
+            st.subheader("Strategy Metrics📈", anchor="_metrics")
+            if state.metric_series:
+                df = pd.DataFrame(state.metric_series)
+                if df.shape[0] == 1:
+                    st.table(df.iloc[0])
+                elif df.shape[0] > 1:
+                    if df.shape[1] == 1:
+                        fig = px.line(df, x=df.index, y=df.columns, markers=True)
+                        fig.update_layout(xaxis_title="Strategy Round", yaxis_title=None)
+                        st.plotly_chart(fig)
+                    else:
+                        # Simple chart without hover texts for strategy metrics
+                        fig = make_subplots(rows=1, cols=min(4, df.shape[1]), subplot_titles=df.columns[:4])
+                        for ci, col in enumerate(df.columns[:4]):
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=df.index,
+                                    y=df[col],
+                                    name=col,
+                                    mode='lines+markers'
+                                ),
+                                row=1, col=ci + 1
+                            )
+                        fig.update_layout(height=300, showlegend=False)
+                        st.plotly_chart(fig)
+            else:
+                st.write("No metrics data available yet.")
+    elif isinstance(state.scenario, SIMILAR_SCENARIOS):
         st.header("Summary📊", divider="rainbow", anchor="_summary")
         if state.lround == 0:
             return
@@ -467,15 +529,36 @@ def summary_window():
                     df = pd.DataFrame([state.alpha_baseline_metrics] + state.metric_series[1:])
                 elif isinstance(state.scenario, QlibQuantScenario) and state.alpha_baseline_metrics is not None:
                     df = pd.DataFrame([state.alpha_baseline_metrics] + state.metric_series[1:])
+                elif isinstance(state.scenario, CustomStrategyScenario):
+                    df = pd.DataFrame(state.metric_series)
+                    # For CustomStrategyScenario, set proper index names that match expected format
+                    if len(df) > 0:
+                        df.index = [f"hypo_{i}" for i in range(len(df))]
                 else:
                     df = pd.DataFrame(state.metric_series)
                 if show_true_only and len(state.hypotheses) >= len(state.metric_series):
+                    selected = []
                     if state.alpha_baseline_metrics is not None:
-                        selected = ["Alpha Base"] + [
-                            i for i in df.index if i == "Baseline" or state.h_decisions[int(i[6:])]
-                        ]
-                    else:
-                        selected = [i for i in df.index if i == "Baseline" or state.h_decisions[int(i[6:])]]
+                        selected.append("Alpha Base")
+                    
+                    for i in df.index:
+                        if i == "Baseline":
+                            selected.append(i)
+                        else:
+                            # Handle different index formats safely
+                            try:
+                                if isinstance(i, str) and i.startswith("hypo_"):
+                                    idx = int(i[5:])  # "hypo_" is 5 characters
+                                elif isinstance(i, int):
+                                    idx = i
+                                else:
+                                    continue
+                                
+                                if idx < len(state.h_decisions) and idx < len(state.hypotheses) and state.h_decisions[idx]:
+                                    selected.append(i)
+                            except (ValueError, IndexError):
+                                continue
+                    
                     df = df.loc[selected]
                 if df.shape[0] == 1:
                     st.table(df.iloc[0])
@@ -720,32 +803,166 @@ def evolving_window():
         else:
             evolving_round = 1
 
-        ws: list[FactorFBWorkspace | ModelFBWorkspace] = state.msgs[round]["evolving code"][evolving_round - 1].content
-        # All Tasks
+        # Check for various message tags that might contain code generation data
+        ws = None
+        if "evolving code" in state.msgs[round] and len(state.msgs[round]["evolving code"]) >= evolving_round:
+            ws = state.msgs[round]["evolving code"][evolving_round - 1].content
+        elif "coding" in state.msgs[round] and len(state.msgs[round]["coding"]) >= evolving_round:
+            ws = state.msgs[round]["coding"][evolving_round - 1].content
+        elif "coder result" in state.msgs[round] and len(state.msgs[round]["coder result"]) >= evolving_round:
+            ws = state.msgs[round]["coder result"][evolving_round - 1].content
+        elif "coder_result" in state.msgs[round] and len(state.msgs[round]["coder_result"]) >= evolving_round:
+            # Handle case where tag might have underscore instead of space
+            ws = state.msgs[round]["coder_result"][evolving_round - 1].content
+        else:
+            # Try to find any message that might contain workspace data
+            for tag in state.msgs[round]:
+                if "code" in tag.lower() or "develop" in tag.lower() or "coder" in tag.lower():
+                    if len(state.msgs[round][tag]) >= evolving_round:
+                        content = state.msgs[round][tag][evolving_round - 1].content
+                        # Check if content is a workspace or list of workspaces
+                        if hasattr(content, 'file_dict') or (isinstance(content, list) and len(content) > 0 and hasattr(content[0], 'file_dict')):
+                            ws = content
+                            break
+            
+        # If still no workspace data found, try to look for generated code files in quant-strategy-lab
+        if ws is None:
+            # Try to find generated code files in quant-strategy-lab
+            try:
+                import os
+                import tempfile
+                from pathlib import Path
+                
+                # Create a temporary workspace to display the code
+                temp_workspace_path = Path(tempfile.mkdtemp())
+                
+                # Look for generated code files in quant-strategy-lab
+                quant_strategies_dir = Path("/workspace/quant-strategy-lab/strategies/rd_agent_generated")
+                if quant_strategies_dir.exists():
+                    # Create a mock workspace with the generated code files
+                    file_dict = {}
+                    for py_file in quant_strategies_dir.glob("*.py"):
+                        if py_file.name != "__init__.py":
+                            try:
+                                with open(py_file, "r") as f:
+                                    file_dict[py_file.name] = f.read()
+                            except Exception:
+                                pass
+                    
+                    if file_dict:
+                        # Create a mock workspace object
+                        class MockWorkspace:
+                            def __init__(self, file_dict, workspace_path):
+                                self.file_dict = file_dict
+                                self.workspace_path = workspace_path
+                                self.target_task = None
+                                
+                        ws = [MockWorkspace(file_dict, temp_workspace_path)]
+                        
+                        # Also try to extract task information from the file names
+                        if hasattr(state, 'hypotheses') and round in state.hypotheses:
+                            hypothesis = state.hypotheses[round]
+                            if hypothesis:
+                                class MockTask:
+                                    def __init__(self, name):
+                                        self.name = name
+                                        self.factor_name = name
+                                        
+                                # Set the task name based on the hypothesis
+                                ws[0].target_task = MockTask(hypothesis.hypothesis)
+            except Exception:
+                pass
+            
+        # If still no workspace data found, show a more informative message
+        if ws is None:
+            # Check if we have any messages at all for this round
+            if not state.msgs[round]:
+                st.warning("No data found for this round. Try running more iterations or check if the experiment completed successfully.")
+                return
+            else:
+                # Show available message tags for debugging
+                available_tags = list(state.msgs[round].keys())
+                st.warning(f"No code generation data found. Available message tags: {', '.join(available_tags)}")
+                return
+                
+        # Check if ws is None or empty
+        if not ws:
+            st.warning("No code generation data found.")
+            return
 
-        tab_names = [
-            w.target_task.factor_name if isinstance(w.target_task, FactorTask) else w.target_task.name for w in ws
-        ]
-        if len(state.msgs[round]["evolving feedback"]) >= evolving_round:
-            for j in range(len(ws)):
-                if state.msgs[round]["evolving feedback"][evolving_round - 1].content[j].final_decision:
-                    tab_names[j] += "✔️"
+        # All Tasks
+        # Filter out any None elements from ws
+        if isinstance(ws, list):
+            ws = [w for w in ws if w is not None]
+        else:
+            # If ws is a single workspace, convert to list
+            ws = [ws] if ws is not None else []
+        
+        if not ws:
+            st.warning("No code generation data found.")
+            return
+
+        # Handle different task types
+        tab_names = []
+        for w in ws:
+            if hasattr(w, 'target_task'):
+                if hasattr(w.target_task, 'factor_name'):
+                    tab_names.append(w.target_task.factor_name)
+                elif hasattr(w.target_task, 'name'):
+                    tab_names.append(w.target_task.name)
                 else:
-                    tab_names[j] += "❌"
+                    tab_names.append("Unknown Task")
+            else:
+                tab_names.append("Generated Code")
+
+        # Add status indicators if feedback is available
+        if "evolving feedback" in state.msgs[round] and len(state.msgs[round]["evolving feedback"]) >= evolving_round:
+            try:
+                feedback_content = state.msgs[round]["evolving feedback"][evolving_round - 1].content
+                for j in range(min(len(ws), len(feedback_content))):
+                    if hasattr(feedback_content[j], 'final_decision') and feedback_content[j].final_decision:
+                        tab_names[j] += "✔️"
+                    else:
+                        tab_names[j] += "❌"
+            except (IndexError, AttributeError):
+                # If there's an issue with feedback data, continue without status indicators
+                pass
         if sum(len(tn) for tn in tab_names) > 100:
             tabs_hint()
         wtabs = st.tabs(tab_names)
         for j, w in enumerate(ws):
             with wtabs[j]:
                 # Evolving Code
-                st.markdown(f"**Workspace Path**: {w.workspace_path}")
+                if hasattr(w, 'workspace_path'):
+                    st.markdown(f"**Workspace Path**: {w.workspace_path}")
                 for k, v in w.file_dict.items():
                     with st.expander(f":green[`{k}`]", expanded=True):
                         st.code(v, language="python")
 
                 # Evolving Feedback
-                if len(state.msgs[round]["evolving feedback"]) >= evolving_round:
-                    evolving_feedback_window(state.msgs[round]["evolving feedback"][evolving_round - 1].content[j])
+                feedback_available = False
+                if "evolving feedback" in state.msgs[round] and len(state.msgs[round]["evolving feedback"]) >= evolving_round:
+                    try:
+                        feedback_content = state.msgs[round]["evolving feedback"][evolving_round - 1].content
+                        if j < len(feedback_content):
+                            feedback_available = True
+                            evolving_feedback_window(feedback_content[j])
+                    except (IndexError, AttributeError):
+                        pass
+                
+                if not feedback_available:
+                    # Check for other types of feedback
+                    feedback_found = False
+                    for tag in ["coding", "coder result", "coder_result", "runner result"]:
+                        if tag in state.msgs[round] and len(state.msgs[round][tag]) >= evolving_round:
+                            # For direct coding approach, we might not have separate feedback messages
+                            # We could display the runner result or other relevant information here
+                            st.info("Code generated successfully. Check the Feedback section for backtesting results.")
+                            feedback_found = True
+                            break
+                    
+                    if not feedback_found:
+                        st.info("Code generated successfully. Check the Feedback section for backtesting results.")
 
 
 toc = """

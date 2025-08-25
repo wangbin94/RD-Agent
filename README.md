@@ -336,6 +336,24 @@ The **[🖥️ Live Demo](https://rdagent.azurewebsites.net/)** is implemented b
   rdagent data_science --competition tabular-playground-series-dec-2021
   ```
 
+### Quant-Strategy-Lab Integration
+- Run the **Automated Quantitative Strategy Research** with quant-strategy-lab framework:
+  ```bash
+  # Run the quant-strategy-lab scenario using the provided shell script
+  ./run_scenario.sh --loops 5
+
+  # Or run directly with Docker
+  docker-compose exec rd-agent python -c "
+  import asyncio
+  from rdagent.app.quant_strategy_lab_loop import CustomStrategyRDLoop
+  from rdagent.scenarios.quant_strategy_lab_conf import CUSTOM_STRATEGY_PROP_SETTING
+  loop = CustomStrategyRDLoop(CUSTOM_STRATEGY_PROP_SETTING)
+  asyncio.run(loop.run(loop_n=1))
+  "
+  ```
+
+  For more details about this scenario, see [Quant-Strategy-Lab Scenario Documentation](docs/quant_strategy_lab_scenario.md)
+
 ### 🖥️ Monitor the Application Results
 - You can run the following command for our demo program to see the run logs.
 

@@ -1,2 +1,16 @@
 [client]
 showSidebarNavigation = false
+
+[server]
+enableWebsocketCompression = false
+enableXsrfProtection = false
+maxUploadSize = 1000
+maxMessageSize = 500
+runOnSave = false
+allowRunOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+magicEnabled = true

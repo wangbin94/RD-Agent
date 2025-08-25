@@ -27,6 +27,7 @@ from rdagent.app.qlib_rd_loop.factor import main as fin_factor
 from rdagent.app.qlib_rd_loop.factor_from_report import main as fin_factor_report
 from rdagent.app.qlib_rd_loop.model import main as fin_model
 from rdagent.app.qlib_rd_loop.quant import main as fin_quant
+from rdagent.app.quant_strategy_lab_loop import main as trading_strategy
 from rdagent.app.utils.health_check import health_check
 from rdagent.app.utils.info import collect_info
 from rdagent.log.mle_summary import grade_summary as grade_summary
@@ -73,6 +74,7 @@ app.command(name="fin_factor")(fin_factor)
 app.command(name="fin_model")(fin_model)
 app.command(name="fin_quant")(fin_quant)
 app.command(name="fin_factor_report")(fin_factor_report)
+app.command(name="trading_strategy")(trading_strategy)
 app.command(name="general_model")(general_model)
 app.command(name="data_science")(data_science)
 app.command(name="grade_summary")(grade_summary)
