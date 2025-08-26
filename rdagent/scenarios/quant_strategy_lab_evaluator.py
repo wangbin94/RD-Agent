@@ -8,6 +8,7 @@ from rdagent.components.coder.CoSTEER.evaluators import (
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
+from rdagent.components.coder.factor_coder.evaluators import FactorSingleFeedback
 from rdagent.core.experiment import FBWorkspace
 from rdagent.log import rdagent_logger as logger
 from rdagent.scenarios.quant_strategy_lab_runner import CustomStrategyRunner
@@ -15,10 +16,11 @@ from rdagent.utils.agent.tpl import T
 
 
 @dataclass
-class StrategyFeedback(CoSTEERSingleFeedback):
+class StrategyFeedback(FactorSingleFeedback):
     """
     Feedback for Strategy CoSTEER evaluation.
     This feedback is used to evaluate strategy backtest performance and code quality.
+    UI-compatible with expected feedback format.
     """
     
     # Strategy performance metrics
@@ -37,6 +39,65 @@ class StrategyFeedback(CoSTEERSingleFeedback):
     
     # Improvement suggestions
     improvement_suggestion: str | None = None
+    
+    def __post_init__(self):
+        """Set UI-compatible feedback after initialization"""
+        
+        # Set final_feedback: Overall strategy assessment summary
+        parts = []
+        if self.total_return is not None:
+            parts.append(f"**Total Return**: {self.total_return:.2%}")
+        if self.sharpe_ratio is not None:
+            parts.append(f"**Sharpe Ratio**: {self.sharpe_ratio:.2f}")
+        if self.max_drawdown is not None:
+            parts.append(f"**Max Drawdown**: {self.max_drawdown:.2%}")
+        if self.win_rate is not None:
+            parts.append(f"**Win Rate**: {self.win_rate:.2%}")
+        
+        status = "✅ **ACCEPTABLE**" if self.is_acceptable() else "❌ **NEEDS IMPROVEMENT**"
+        parts.append(f"\n{status}")
+        
+        if self.improvement_suggestion:
+            parts.append(f"\n**Improvement Suggestions**:\n{self.improvement_suggestion}")
+        
+        self.final_feedback = "\n".join(parts) if parts else "Strategy evaluation completed."
+        
+        # Set execution_feedback: Backtest execution logs
+        self.execution_feedback = self.execution or "No execution feedback available."
+        
+        # Set code_feedback: Strategy code quality assessment  
+        feedback_parts = []
+        if self.code_executable is not None:
+            status = "✅ Executable" if self.code_executable else "❌ Not Executable"
+            feedback_parts.append(f"**Code Status**: {status}")
+        
+        if self.code_has_errors:
+            feedback_parts.append("**Issues**: Code contains errors that need to be resolved")
+        elif self.code_executable:
+            feedback_parts.append("**Quality**: Code executed successfully without errors")
+            
+        if self.code:
+            feedback_parts.append(f"\n**Code Analysis**:\n{self.code}")
+        
+        self.code_feedback = "\n".join(feedback_parts) if feedback_parts else "No code feedback available."
+        
+        # Set value_feedback: Detailed financial metrics table
+        metrics = []
+        if self.total_return is not None:
+            metrics.append(f"Total Return: {self.total_return:.2%}")
+        if self.sharpe_ratio is not None:
+            metrics.append(f"Sharpe Ratio: {self.sharpe_ratio:.2f}")
+        if self.max_drawdown is not None:
+            metrics.append(f"Max Drawdown: {self.max_drawdown:.2%}")
+        if self.win_rate is not None:
+            metrics.append(f"Win Rate: {self.win_rate:.2%}")
+        if self.performance_score is not None:
+            metrics.append(f"Performance Score: {self.performance_score:.2f}")
+        
+        if metrics:
+            self.value_feedback = "**Strategy Performance Metrics:**\n" + "\n".join(f"- {metric}" for metric in metrics)
+        else:
+            self.value_feedback = self.return_checking or "No performance metrics available."
     
     def is_acceptable(self) -> bool:
         """

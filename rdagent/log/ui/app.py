@@ -348,6 +348,22 @@ def evolving_feedback_window(wsf: FactorSingleFeedback | ModelSingleFeedback):
             st.markdown(wsf.shape_feedback)
         with vfc:
             st.markdown(wsf.value_feedback)
+    else:
+        # Fallback for any feedback object that has the standard UI properties
+        if all(hasattr(wsf, attr) for attr in ['final_feedback', 'execution_feedback', 'code_feedback', 'value_feedback']):
+            ffc, efc, cfc, vfc = st.tabs(
+                ["**Final Feedback🏁**", "Execution Feedback🖥️", "Code Feedback📄", "Value Feedback🔢"]
+            )
+            with ffc:
+                st.markdown(wsf.final_feedback)
+            with efc:
+                st.code(wsf.execution_feedback, language="log")
+            with cfc:
+                st.markdown(wsf.code_feedback)
+            with vfc:
+                st.markdown(wsf.value_feedback)
+        else:
+            st.warning(f"Unsupported feedback type: {type(wsf).__name__}. Expected FactorSingleFeedback or ModelSingleFeedback.")
 
 
 def display_hypotheses(hypotheses: dict[int, Hypothesis], decisions: dict[int, bool], success_only: bool = False):

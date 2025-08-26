@@ -4,7 +4,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import CoSTEERQueried
 from rdagent.core.experiment import FBWorkspace
 from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
 from rdagent.scenarios.quant_strategy_lab_experiment import StrategyWorkspace
-from rdagent.scenarios.quant_strategy_lab_coder import TaskWorkspace
+from rdagent.scenarios.quant_strategy_lab_experiment import TaskWorkspace
 from rdagent.oai.llm_utils import APIBackend
 from rdagent.log import rdagent_logger as logger
 

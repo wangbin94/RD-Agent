@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from rdagent.components.coder.CoSTEER import CoSTEER
 from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiEvaluator
-from rdagent.scenarios.quant_strategy_lab_experiment import StrategyExperiment
+from rdagent.scenarios.quant_strategy_lab_experiment import StrategyExperiment, TaskWorkspace
 from rdagent.scenarios.quant_strategy_lab_scenario import CustomStrategyScenario
 from rdagent.scenarios.quant_strategy_lab_evaluator import StrategyEvaluator, StrategyFeedback
 from rdagent.scenarios.quant_strategy_lab_evolving_strategy import StrategyEvolvingStrategy
@@ -13,14 +13,6 @@ from rdagent.oai.llm_utils import APIBackend
 from rdagent.core.experiment import FBWorkspace
 from rdagent.log import rdagent_logger as logger
 import json
-
-class TaskWorkspace(FBWorkspace):
-    """Workspace object for displaying task results in UI"""
-    def __init__(self, task, workspace_path):
-        super().__init__()
-        self.target_task = task
-        self.workspace_path = workspace_path
-        self.file_dict = {}  # Will be populated with filename -> code mappings
 
 class CustomStrategyCoder(CoSTEER):
     def __init__(self, scen: CustomStrategyScenario) -> None:

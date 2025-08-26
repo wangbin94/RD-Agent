@@ -4,6 +4,14 @@ from rdagent.scenarios.quant_strategy_lab_task import StrategyTask
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
+class TaskWorkspace(FBWorkspace):
+    """Workspace object for displaying task results in UI"""
+    def __init__(self, task, workspace_path):
+        super().__init__()
+        self.target_task = task
+        self.workspace_path = workspace_path
+        self.file_dict = {}  # Will be populated with filename -> code mappings
+
 class StrategyExperiment(Experiment):
     def __init__(self, tasks: List[StrategyTask], *args, **kwargs) -> None:
         """

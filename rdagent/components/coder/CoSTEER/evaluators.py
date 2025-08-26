@@ -215,6 +215,14 @@ class CoSTEERMultiFeedback(Feedback):
     def __bool__(self) -> bool:
         return all(feedback.final_decision for feedback in self.feedback_list)
 
+    @property
+    def content(self) -> List[CoSTEERSingleFeedback]:
+        """
+        Provide UI compatibility by exposing feedback_list as content.
+        This allows the UI to access feedback via the expected .content attribute.
+        """
+        return self.feedback_list
+
 
 class CoSTEEREvaluator(Evaluator):
     def __init__(
